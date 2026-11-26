@@ -67,7 +67,7 @@
         ],
         "MARKETING_VERSION": "1.0",
         "OTHER_SWIFT_FLAGS": "$(inherited) -Xcc -DACCELERATE_NEW_LAPACK",
-        "PRODUCT_BUNDLE_IDENTIFIER": "ericji.TalkAcross",
+        "PRODUCT_BUNDLE_IDENTIFIER": "oneclick.talkacross.jp",
         "PRODUCT_NAME": "$(TARGET_NAME)",
         "STRING_CATALOG_GENERATE_SYMBOLS": "YES",
         "SWIFT_APPROACHABLE_CONCURRENCY": "YES",
