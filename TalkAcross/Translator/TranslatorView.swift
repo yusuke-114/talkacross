@@ -12,13 +12,26 @@ struct TranslatorView: View {
     @State private var showsTextInput = false
     @State private var textDraft = ""
 
+    private struct VoiceReadinessCheck: Equatable {
+        let direction: TranslationDirection
+        let input: ChineseSpeechInput
+    }
+
+    private var voiceReadinessCheck: VoiceReadinessCheck? {
+        guard scenePhase == .active, !showsSettings else { return nil }
+        return VoiceReadinessCheck(direction: viewModel.direction, input: viewModel.chineseSpeechInput)
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 12) {
                     directionControl
-                    transcript("原文", text: viewModel.sourceText)
-                    transcript("译文", text: viewModel.translatedText, canReplay: true)
+                    if !showsTextInput, !viewModel.missingVoiceResources.isEmpty {
+                        voiceSetupPrompt
+                    }
+                    transcript("translator.source_text", text: viewModel.sourceText)
+                    transcript("translator.translated_text", text: viewModel.translatedText, canReplay: true)
 
                     if let notice = viewModel.engineNotice {
                         Text(notice)
@@ -33,13 +46,13 @@ struct TranslatorView: View {
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
                             if viewModel.canRetryTranslation {
-                                Button("重试", action: viewModel.retryTranslation)
+                                Button("common.retry", action: viewModel.retryTranslation)
                             }
                             if viewModel.needsSystemSettings, let settings = URL(string: UIApplication.openSettingsURLString) {
-                                Button("打开系统设置") { openURL(settings) }
+                                Button("common.open_system_settings") { openURL(settings) }
                             }
                             if viewModel.needsAppSettings {
-                                Button("设置") { showsSettings = true }
+                                Button("common.settings") { showsSettings = true }
                             }
                         }
                     }
@@ -58,19 +71,36 @@ struct TranslatorView: View {
             .toolbar {
                 #if DEBUG
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("示例", action: viewModel.translateExample)
+                    Button("translator.sample", action: viewModel.translateExample)
                         .disabled(viewModel.isBusy || showsTextInput)
                 }
                 #endif
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("设置", systemImage: "gearshape") {
+                    Button("common.settings", systemImage: "gearshape") {
                         showsSettings = true
                     }
                     .disabled(viewModel.isBusy)
                 }
             }
             .sheet(isPresented: $showsSettings) {
-                SettingsView()
+                SettingsView(priorityResources: viewModel.missingVoiceResources)
+            }
+            .task(id: voiceReadinessCheck) {
+                guard voiceReadinessCheck != nil else { return }
+                await viewModel.refreshVoiceReadiness()
+            }
+            .alert(
+                "voice_setup.alert_title",
+                isPresented: Binding(
+                    get: { viewModel.voiceResourceAlert != nil },
+                    set: { if !$0 { viewModel.dismissVoiceResourceAlert() } }
+                ),
+                presenting: viewModel.voiceResourceAlert
+            ) { _ in
+                Button("voice_setup.open_settings") { showsSettings = true }
+                Button("common.later", role: .cancel) { }
+            } message: { resources in
+                Text(resources.map(\.title).joined(separator: "\n"))
             }
             .onChange(of: scenePhase) {
                 if scenePhase == .background {
@@ -85,17 +115,34 @@ struct TranslatorView: View {
         }
     }
 
+    private var voiceSetupPrompt: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("voice_setup.title")
+                .font(.subheadline.weight(.semibold))
+            Text(viewModel.missingVoiceResources.map(\.title).formatted(.list(type: .and)))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Button("voice_setup.open_settings") { showsSettings = true }
+                .font(.subheadline)
+                .disabled(viewModel.isBusy)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 16))
+        .accessibilityIdentifier("voiceSetupPrompt")
+    }
+
     private var microphoneControl: some View {
         let capturing = viewModel.isHoldingMicrophone
         let available = !viewModel.isBusy || capturing
         let recording = viewModel.phase == .recording
         let title: LocalizedStringKey = switch viewModel.phase {
-        case .preparing: "正在准备…"
-        case .recording: "松手结束"
-        case .recognizing: "正在识别…"
-        case .translating: "正在翻译…"
-        case .speaking: "正在朗读…"
-        case .idle: "按住说话"
+        case .preparing: "common.preparing"
+        case .recording: "translator.release_to_finish"
+        case .recognizing: "translator.recognizing"
+        case .translating: "translator.translating"
+        case .speaking: "translator.speaking"
+        case .idle: "translator.hold_to_speak"
         }
 
         return Label(title, systemImage: recording ? "waveform" : "mic.fill")
@@ -122,7 +169,7 @@ struct TranslatorView: View {
                 isRecording
             }
             .accessibilityAddTraits(.isButton)
-            .accessibilityHint("轻点两次开始或结束录音")
+            .accessibilityHint("translator.microphone_accessibility_hint")
             .accessibilityAction {
                 if capturing {
                     viewModel.endPress()
@@ -146,7 +193,7 @@ struct TranslatorView: View {
             }
             .frame(maxWidth: .infinity)
 
-            Button("切换方向", systemImage: "arrow.left.arrow.right") {
+            Button("translator.swap_direction", systemImage: "arrow.left.arrow.right") {
                 closeTextInput()
                 viewModel.swapDirection()
             }
@@ -167,11 +214,11 @@ struct TranslatorView: View {
     private var chineseInputControl: some View {
         Menu {
             Picker(
-                "中文语音",
+                "language.chinese_input",
                 selection: Binding(get: { viewModel.chineseSpeechInput }, set: viewModel.selectChineseSpeechInput)
             ) {
-                Text("普通话").tag(ChineseSpeechInput.mandarin)
-                Text("上海话（可能需联网）").tag(ChineseSpeechInput.shanghainese)
+                Text("language.mandarin").tag(ChineseSpeechInput.mandarin)
+                Text("language.shanghainese_network").tag(ChineseSpeechInput.shanghainese)
             }
         } label: {
             HStack(spacing: 6) {
@@ -187,7 +234,7 @@ struct TranslatorView: View {
         }
         .foregroundStyle(.primary)
         .disabled(viewModel.isBusy)
-        .accessibilityLabel("中文语音")
+        .accessibilityLabel("language.chinese_input")
         .accessibilityValue(Text(viewModel.chineseSpeechInput.title))
         .accessibilityIdentifier("chineseSpeechInput")
     }
@@ -202,7 +249,7 @@ struct TranslatorView: View {
 
                 if !canReplay, !showsTextInput {
                     Spacer()
-                    Button("文字输入", systemImage: "keyboard") {
+                    Button("translator.text_input", systemImage: "keyboard") {
                         textDraft = viewModel.sourceText
                         showsTextInput = true
                     }
@@ -210,7 +257,7 @@ struct TranslatorView: View {
                     .disabled(viewModel.isBusy)
                 } else if canReplay, !text.isEmpty {
                     Spacer()
-                    Button("重听", systemImage: "speaker.wave.2", action: viewModel.replay)
+                    Button("translator.replay", systemImage: "speaker.wave.2", action: viewModel.replay)
                         .labelStyle(.iconOnly)
                         .disabled(viewModel.isBusy || showsTextInput)
                 }
@@ -220,9 +267,9 @@ struct TranslatorView: View {
                 textInputEditor
             } else if canReplay, viewModel.phase == .translating {
                 ProgressView()
-                    .accessibilityLabel("正在翻译")
+                    .accessibilityLabel("translator.translating_accessibility")
             } else if !canReplay, text.isEmpty, viewModel.phase == .recording {
-                Text("正在听…")
+                Text("translator.listening")
                     .foregroundStyle(.secondary)
             } else if !text.isEmpty {
                 Text(text)
@@ -237,7 +284,7 @@ struct TranslatorView: View {
 
     private var textInputEditor: some View {
         VStack(alignment: .leading, spacing: 12) {
-            TextField("输入或听写原文", text: $textDraft, axis: .vertical)
+            TextField("translator.text_input_placeholder", text: $textDraft, axis: .vertical)
                 .font(.title3)
                 .lineLimit(2...6)
                 .focused($focusesTextInput)
@@ -245,15 +292,15 @@ struct TranslatorView: View {
                 .onAppear { focusesTextInput = true }
 
             if viewModel.direction.source == .mandarin, viewModel.chineseSpeechInput == .shanghainese {
-                Text("上海话可用系统键盘听写，可能需要联网。")
+                Text("translator.shanghainese_dictation_hint")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
 
             HStack {
-                Button("取消", action: closeTextInput)
+                Button("common.cancel", action: closeTextInput)
                 Spacer()
-                Button("翻译") {
+                Button("translator.translate") {
                     viewModel.translateText(textDraft)
                     closeTextInput()
                 }

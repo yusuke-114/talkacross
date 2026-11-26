@@ -13,9 +13,9 @@ nonisolated enum WhisperModel: String, CaseIterable, Sendable {
 
     var downloadSize: String {
         switch self {
-        case .base: String(localized: "约 147 MB")
-        case .small: String(localized: "约 486 MB")
-        case .largeTurbo: String(localized: "约 646 MB")
+        case .base: String(localized: "model.base.download_size")
+        case .small: String(localized: "model.small.download_size")
+        case .largeTurbo: String(localized: "model.large_turbo.download_size")
         }
     }
 

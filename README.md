@@ -1,5 +1,5 @@
 <p>
-  <img src="TalkAcross/Assets.xcassets/AppIcon.appiconset/TalkAcross.png" alt="TalkAcross 应用图标" width="96">
+  <img src="docs/assets/readme-icon.png" alt="TalkAcross 应用图标" width="96">
 </p>
 
 # TalkAcross
