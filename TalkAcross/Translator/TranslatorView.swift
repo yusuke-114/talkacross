@@ -12,11 +12,24 @@ struct TranslatorView: View {
     @State private var showsTextInput = false
     @State private var textDraft = ""
 
+    private struct VoiceReadinessCheck: Equatable {
+        let direction: TranslationDirection
+        let input: ChineseSpeechInput
+    }
+
+    private var voiceReadinessCheck: VoiceReadinessCheck? {
+        guard scenePhase == .active, !showsSettings else { return nil }
+        return VoiceReadinessCheck(direction: viewModel.direction, input: viewModel.chineseSpeechInput)
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 12) {
                     directionControl
+                    if !showsTextInput, !viewModel.missingVoiceResources.isEmpty {
+                        voiceSetupPrompt
+                    }
                     transcript("原文", text: viewModel.sourceText)
                     transcript("译文", text: viewModel.translatedText, canReplay: true)
 
@@ -70,7 +83,24 @@ struct TranslatorView: View {
                 }
             }
             .sheet(isPresented: $showsSettings) {
-                SettingsView()
+                SettingsView(priorityResources: viewModel.missingVoiceResources)
+            }
+            .task(id: voiceReadinessCheck) {
+                guard voiceReadinessCheck != nil else { return }
+                await viewModel.refreshVoiceReadiness()
+            }
+            .alert(
+                "需要准备语音翻译资源",
+                isPresented: Binding(
+                    get: { viewModel.voiceResourceAlert != nil },
+                    set: { if !$0 { viewModel.dismissVoiceResourceAlert() } }
+                ),
+                presenting: viewModel.voiceResourceAlert
+            ) { _ in
+                Button("前往设置") { showsSettings = true }
+                Button("稍后", role: .cancel) { }
+            } message: { resources in
+                Text(resources.map(\.title).joined(separator: "\n"))
             }
             .onChange(of: scenePhase) {
                 if scenePhase == .background {
@@ -83,6 +113,23 @@ struct TranslatorView: View {
                 viewModel.cancel()
             }
         }
+    }
+
+    private var voiceSetupPrompt: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("准备语音翻译")
+                .font(.subheadline.weight(.semibold))
+            Text(viewModel.missingVoiceResources.map(\.title).formatted(.list(type: .and)))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Button("前往设置") { showsSettings = true }
+                .font(.subheadline)
+                .disabled(viewModel.isBusy)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 16))
+        .accessibilityIdentifier("voiceSetupPrompt")
     }
 
     private var microphoneControl: some View {

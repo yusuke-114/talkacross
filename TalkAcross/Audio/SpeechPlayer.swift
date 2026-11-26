@@ -11,6 +11,10 @@ final class SpeechPlayer: NSObject, AVSpeechSynthesizerDelegate {
         synthesizer.delegate = self
     }
 
+    static func isVoiceAvailable(for language: SpokenLanguage) -> Bool {
+        AVSpeechSynthesisVoice(language: language.speechIdentifier) != nil
+    }
+
     func play(_ text: String, language: SpokenLanguage, completion: @escaping () -> Void) throws {
         guard let voice = AVSpeechSynthesisVoice(language: language.speechIdentifier) else {
             throw PlaybackIssue.voiceUnavailable

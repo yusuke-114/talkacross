@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import Speech
+import Translation
 
 @MainActor
 @Observable
@@ -19,6 +20,8 @@ final class TranslatorViewModel {
     private(set) var needsSystemSettings = false
     private(set) var needsAppSettings = false
     private(set) var engineNotice: String?
+    private(set) var missingVoiceResources: [VoiceResource] = []
+    private(set) var voiceResourceAlert: [VoiceResource]?
 
     private let recorder = AudioRecorder()
     private let appleSpeech = AppleSpeechRecognizer()
@@ -29,14 +32,15 @@ final class TranslatorViewModel {
     @ObservationIgnored private var roundTask: Task<Void, Never>?
     @ObservationIgnored private var roundID = UUID()
     @ObservationIgnored private var recordingStarted: ContinuousClock.Instant?
-    private var isRequestingPermission = false
+    private var microphoneHeld = false
 
-    var isBusy: Bool { phase != .idle || isRequestingPermission }
-    var isHoldingMicrophone: Bool { phase == .preparing || phase == .recording }
+    var isBusy: Bool { phase != .idle }
+    var isHoldingMicrophone: Bool { microphoneHeld && (phase == .preparing || phase == .recording) }
 
     func swapDirection() {
         guard !isBusy else { return }
         direction = direction.reversed
+        missingVoiceResources = []
         clearDisplayedRound()
     }
 
@@ -44,6 +48,7 @@ final class TranslatorViewModel {
         guard !isBusy, direction.source == .mandarin, chineseSpeechInput != input else { return }
         chineseSpeechInput = input
         ChineseSpeechInput.preferred = input
+        missingVoiceResources = []
         clearDisplayedRound()
     }
 
@@ -59,27 +64,19 @@ final class TranslatorViewModel {
 
     func beginPress() {
         guard !isBusy else { return }
-        let usesShanghainese = direction.source == .mandarin && chineseSpeechInput == .shanghainese
-        // System permission alerts end the hold gesture, so ask outside of a recording round.
-        if recorder.needsPermission || (usesShanghainese && ShanghaineseSpeechRecognizer.needsAuthorization) {
-            requestPermissions(includingSpeech: usesShanghainese)
-            return
-        }
         let id = beginRound(phase: .preparing)
+        microphoneHeld = true
         let direction = self.direction
-        let engine = SpeechEngine.preferred
-        let whisperModel = WhisperModel.preferred
         let input = chineseSpeechInput
+        let usesShanghainese = direction.source == .mandarin && input == .shanghainese
+        // System permission alerts end the hold. Always require a new press after the alert.
+        let needsNewPress = recorder.needsPermission || (usesShanghainese && ShanghaineseSpeechRecognizer.needsAuthorization)
 
         roundTask = Task { [weak self] in
-            guard let self else { return }
+            guard let self, isCurrent(id) else { return }
             defer { finishTask(id) }
 
             do {
-                let recognizer = try await recognizer(
-                    for: engine, language: direction.source, input: input, model: whisperModel, round: id
-                )
-                guard isCurrent(id) else { return }
                 let allowed = await recorder.requestPermission()
                 guard isCurrent(id) else { return }
                 guard allowed else {
@@ -88,7 +85,27 @@ final class TranslatorViewModel {
                     phase = .idle
                     return
                 }
+                if usesShanghainese {
+                    let authorized = await ShanghaineseSpeechRecognizer.requestAuthorizationIfNeeded()
+                    guard isCurrent(id) else { return }
+                    guard authorized else { throw SpeechRecognitionIssue.speechPermissionDenied }
+                }
 
+                let readiness = await voiceReadiness(for: direction, input: input)
+                guard isCurrent(id) else { return }
+                missingVoiceResources = readiness.missingResources
+                guard readiness.missingResources.isEmpty else {
+                    voiceResourceAlert = readiness.missingResources
+                    return
+                }
+                if needsNewPress {
+                    errorMessage = String(localized: "已获得权限，请重新按住说话。")
+                    return
+                }
+                guard microphoneHeld else { return }
+
+                let recognizer = try await prepareRecognizer(for: readiness.input)
+                guard isCurrent(id), microphoneHeld else { return }
                 let audio = try recorder.start()
                 recordingStarted = .now
                 phase = .recording
@@ -121,30 +138,23 @@ final class TranslatorViewModel {
         }
     }
 
-    private func requestPermissions(includingSpeech: Bool) {
-        clearDisplayedRound()
-        isRequestingPermission = true
-        Task { [weak self] in
-            guard let self else { return }
-            defer { isRequestingPermission = false }
-            guard await recorder.requestPermission() else {
-                needsSystemSettings = true
-                errorMessage = String(localized: "请在系统设置中允许访问麦克风。")
-                return
-            }
-            if includingSpeech, await !ShanghaineseSpeechRecognizer.requestAuthorizationIfNeeded() {
-                needsSystemSettings = true
-                errorMessage = SpeechRecognitionIssue.speechPermissionDenied.errorDescription
-                return
-            }
-            errorMessage = String(localized: "已获得权限，请重新按住说话。")
-        }
+    func dismissVoiceResourceAlert() {
+        voiceResourceAlert = nil
+    }
+
+    func refreshVoiceReadiness() async {
+        guard !isBusy else { return }
+        let id = roundID
+        let direction = self.direction
+        let input = chineseSpeechInput
+        let readiness = await voiceReadiness(for: direction, input: input)
+        guard isCurrent(id), !isBusy, direction == self.direction, input == chineseSpeechInput else { return }
+        missingVoiceResources = readiness.missingResources
     }
 
     func endPress() {
+        microphoneHeld = false
         switch phase {
-        case .preparing:
-            cancel()
         case .recording:
             guard let recordingStarted, recordingStarted.duration(to: .now) >= .milliseconds(500) else {
                 cancel()
@@ -180,11 +190,12 @@ final class TranslatorViewModel {
     }
 
     func cancel() {
-        let wasCapturing = isHoldingMicrophone || phase == .recognizing
+        let wasCapturing = phase == .preparing || phase == .recording || phase == .recognizing
         roundID = UUID()
         roundTask?.cancel()
         roundTask = nil
         recorder.stop()
+        microphoneHeld = false
         recordingStarted = nil
         player.stop()
         if wasCapturing {
@@ -222,7 +233,10 @@ final class TranslatorViewModel {
             let response = try await translation.translate(standardText, direction: direction)
             guard isCurrent(id) else { return }
             translatedText = response
-            playTranslation()
+            phase = .idle
+            if SpeechPlayer.isVoiceAvailable(for: direction.target) {
+                playTranslation()
+            }
         } catch {
             guard isCurrent(id) else { return }
             errorMessage = (error as? LocalizedError)?.errorDescription ?? String(localized: "翻译失败，请重试。")
@@ -246,40 +260,49 @@ final class TranslatorViewModel {
         return roundID
     }
 
-    private func recognizer(
-        for engine: SpeechEngine, language: SpokenLanguage, input: ChineseSpeechInput, model: WhisperModel, round id: UUID
-    ) async throws -> any SpeechRecognizing {
-        if language == .mandarin, input == .shanghainese {
-            try await shanghaineseModels.requirePack()
-            guard isCurrent(id) else { throw CancellationError() }
-            return try await ShanghaineseSpeechRecognizer.prepare()
-        }
-
-        if engine == .apple {
-            let status = await appleSpeech.availability(for: language)
-            guard isCurrent(id) else { throw CancellationError() }
-            switch status {
-            case .installed:
-                return appleSpeech
-            case .unsupported:
-                break
-            default:
-                throw SpeechRecognitionIssue.appleAssetsMissing
+    private func voiceReadiness(for direction: TranslationDirection, input: ChineseSpeechInput) async -> VoiceReadiness {
+        let engine = SpeechEngine.preferred
+        let model = WhisperModel.preferred
+        let voiceInput: VoiceInput
+        let recognitionReady: Bool
+        if direction.source == .mandarin, input == .shanghainese {
+            voiceInput = .shanghainese
+            recognitionReady = await shanghaineseModels.status == .ready
+        } else {
+            let appleStatus = engine == .apple ? await appleSpeech.availability(for: direction.source) : .unsupported
+            if appleStatus == .unsupported {
+                voiceInput = .whisper(model)
+                recognitionReady = await whisperModels.status(for: model) == .ready
+            } else {
+                voiceInput = .apple
+                recognitionReady = appleStatus == .installed
             }
         }
+        return VoiceReadiness(
+            direction: direction, input: voiceInput,
+            translationReady: await translation.availability(for: direction) == .installed,
+            recognitionReady: recognitionReady, voiceReady: SpeechPlayer.isVoiceAvailable(for: direction.target)
+        )
+    }
 
-        let status = await whisperModels.recognitionStatus(for: model)
-        guard isCurrent(id) else { throw CancellationError() }
-        switch status {
-        case .ready:
-            if engine == .apple {
+    private func prepareRecognizer(for input: VoiceInput) async throws -> any SpeechRecognizing {
+        switch input {
+        case .apple:
+            return appleSpeech
+        case .shanghainese:
+            return try await ShanghaineseSpeechRecognizer.prepare()
+        case .whisper(let model):
+            let status = await whisperModels.recognitionStatus(for: model)
+            try Task.checkCancellation()
+            switch status {
+            case .missing: throw SpeechRecognitionIssue.whisperModelMissing
+            case .preparing: throw SpeechRecognitionIssue.whisperBusy
+            case .ready: break
+            }
+            if SpeechEngine.preferred == .apple {
                 engineNotice = String(localized: "Apple 原生识别不可用，已切换到 WhisperKit。")
             }
             return WhisperKitRecognizer(model: model)
-        case .preparing:
-            throw SpeechRecognitionIssue.whisperBusy
-        case .missing:
-            throw engine == .apple ? SpeechRecognitionIssue.fallbackModelMissing : SpeechRecognitionIssue.whisperModelMissing
         }
     }
 
@@ -291,6 +314,10 @@ final class TranslatorViewModel {
         guard id == roundID else { return }
         roundTask = nil
         recordingStarted = nil
+        if phase == .preparing {
+            microphoneHeld = false
+            phase = .idle
+        }
     }
 
     private func acceptPartial(_ text: String, for id: UUID) {

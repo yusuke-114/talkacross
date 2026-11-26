@@ -1,4 +1,3 @@
-import AVFoundation
 import Observation
 import Speech
 import Translation
@@ -39,7 +38,7 @@ final class SettingsViewModel {
         await refreshSpeechStatuses(for: SpokenLanguage.allCases)
         guard !Task.isCancelled else { return }
         for language in SpokenLanguage.allCases {
-            voiceAvailability[language] = AVSpeechSynthesisVoice(language: language.speechIdentifier) != nil
+            voiceAvailability[language] = SpeechPlayer.isVoiceAvailable(for: language)
         }
     }
 
