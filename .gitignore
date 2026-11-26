@@ -1,0 +1,20 @@
+# macOS and Xcode local state
+.DS_Store
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+.build/
+*.xcarchive
+
+# Local signing and credentials
+*.mobileprovision
+*.provisionprofile
+*.p12
+*.p8
+.env
+.env.*
+
+# Local design and development files
+/Design/
+/IMPLEMENTATION_PLAN.md
