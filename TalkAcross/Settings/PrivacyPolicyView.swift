@@ -6,7 +6,7 @@ struct PrivacyPolicyView: View {
 
     var body: some View {
         WebView(page)
-            .navigationTitle("隐私政策")
+            .navigationTitle("settings.privacy_policy")
             .navigationBarTitleDisplayMode(.inline)
             .task {
                 guard let url = Bundle.main.url(forResource: "PrivacyPolicy", withExtension: "html"),

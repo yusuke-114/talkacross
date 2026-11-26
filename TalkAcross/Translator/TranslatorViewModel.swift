@@ -81,7 +81,7 @@ final class TranslatorViewModel {
                 guard isCurrent(id) else { return }
                 guard allowed else {
                     needsSystemSettings = true
-                    errorMessage = String(localized: "请在系统设置中允许访问麦克风。")
+                    errorMessage = String(localized: "error.audio.microphone_permission_denied")
                     phase = .idle
                     return
                 }
@@ -99,7 +99,7 @@ final class TranslatorViewModel {
                     return
                 }
                 if needsNewPress {
-                    errorMessage = String(localized: "已获得权限，请重新按住说话。")
+                    errorMessage = String(localized: "translator.permission_granted")
                     return
                 }
                 guard microphoneHeld else { return }
@@ -121,7 +121,7 @@ final class TranslatorViewModel {
                 guard isCurrent(id) else { return }
                 recorder.stop()
                 sourceText = ""
-                errorMessage = (error as? LocalizedError)?.errorDescription ?? String(localized: "识别失败，请重试。")
+                errorMessage = (error as? LocalizedError)?.errorDescription ?? String(localized: "error.speech.recognition_failed")
                 switch error as? SpeechRecognitionIssue {
                 case .speechPermissionDenied:
                     needsSystemSettings = true
@@ -239,7 +239,7 @@ final class TranslatorViewModel {
             }
         } catch {
             guard isCurrent(id) else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? String(localized: "翻译失败，请重试。")
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? String(localized: "error.translation.failed")
             switch error {
             case ShanghaineseNormalizationIssue.modelMissing, ShanghaineseNormalizationIssue.invalidPack,
                  TranslationIssue.resourcesNeeded:
@@ -300,7 +300,7 @@ final class TranslatorViewModel {
             case .ready: break
             }
             if SpeechEngine.preferred == .apple {
-                engineNotice = String(localized: "Apple 原生识别不可用，已切换到 WhisperKit。")
+                engineNotice = String(localized: "translator.whisper_fallback_notice")
             }
             return WhisperKitRecognizer(model: model)
         }
@@ -333,7 +333,7 @@ final class TranslatorViewModel {
                 self?.phase = .idle
             }
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? String(localized: "朗读失败。")
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? String(localized: "error.playback.failed")
             phase = .idle
         }
     }

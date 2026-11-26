@@ -109,10 +109,10 @@ nonisolated enum ShanghaineseNormalizationIssue: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .modelMissing: String(localized: "请在设置中下载上海话转换包。")
-        case .invalidPack: String(localized: "上海话转换包无法读取，请重新下载。")
-        case .textTooLong: String(localized: "上海话原文太长，请分段翻译。")
-        case .noConversion: String(localized: "无法将这段上海话转换为普通话，请试试短一点的句子。")
+        case .modelMissing: String(localized: "error.shanghainese.pack_missing")
+        case .invalidPack: String(localized: "error.shanghainese.invalid_pack")
+        case .textTooLong: String(localized: "error.shanghainese.text_too_long")
+        case .noConversion: String(localized: "error.shanghainese.conversion_failed")
         }
     }
 }

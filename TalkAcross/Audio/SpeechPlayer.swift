@@ -62,6 +62,6 @@ private enum PlaybackIssue: LocalizedError {
     case voiceUnavailable
 
     var errorDescription: String? {
-        String(localized: "系统缺少此语言的朗读语音。")
+        String(localized: "error.playback.voice_unavailable")
     }
 }

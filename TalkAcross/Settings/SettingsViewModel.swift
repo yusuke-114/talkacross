@@ -71,7 +71,7 @@ final class SettingsViewModel {
         do {
             try await shanghaineseModels.download()
         } catch {
-            shanghaineseMessage = String(localized: "上海话转换包下载失败，请重试。")
+            shanghaineseMessage = String(localized: "error.shanghainese.download_failed")
         }
         await refreshShanghaineseStatus()
     }
@@ -82,7 +82,7 @@ final class SettingsViewModel {
         do {
             try await shanghaineseModels.remove()
         } catch {
-            shanghaineseMessage = String(localized: "模型删除失败，请重试。")
+            shanghaineseMessage = String(localized: "error.model.deletion_failed")
         }
         await refreshShanghaineseStatus()
     }
@@ -118,7 +118,7 @@ final class SettingsViewModel {
             try await whisperModels.prepare(selectedModel)
         } catch {
             guard model == selectedModel else { return }
-            modelMessage = (error as? SpeechRecognitionIssue)?.errorDescription ?? String(localized: "模型准备失败，请重试。")
+            modelMessage = (error as? SpeechRecognitionIssue)?.errorDescription ?? String(localized: "error.model.preparation_failed")
         }
         guard model == selectedModel else { return }
         await refreshModelStatus()
@@ -132,7 +132,7 @@ final class SettingsViewModel {
             try await whisperModels.remove(selectedModel)
         } catch {
             guard model == selectedModel else { return }
-            modelMessage = (error as? SpeechRecognitionIssue)?.errorDescription ?? String(localized: "模型删除失败，请重试。")
+            modelMessage = (error as? SpeechRecognitionIssue)?.errorDescription ?? String(localized: "error.model.deletion_failed")
         }
         guard model == selectedModel else { return }
         await refreshModelStatus()

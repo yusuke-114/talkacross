@@ -40,8 +40,8 @@ enum TranslationIssue: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .resourcesNeeded: String(localized: "请在设置中下载翻译语言。")
-        case .unavailable: String(localized: "这台设备暂时无法使用此翻译方向。")
+        case .resourcesNeeded: String(localized: "error.translation.resources_needed")
+        case .unavailable: String(localized: "error.translation.direction_unavailable")
         }
     }
 }

@@ -12,30 +12,30 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 if !priorityResources.isEmpty {
-                    Section("准备语音翻译") {
+                    Section("voice_setup.title") {
                         ForEach(priorityResources, id: \.self) { resource in
                             priorityRow(for: resource)
                         }
                     }
                 }
-                Section("翻译语言") {
+                Section("settings.translation_languages") {
                     ForEach(TranslationDirection.allCases.filter { !priorityResources.contains(.translation($0)) }, id: \.self) {
                         translationRow($0)
                     }
                 }
-                Section("Apple 原生识别") {
+                Section("settings.apple_speech_resources") {
                     ForEach(SpokenLanguage.allCases.filter { !priorityResources.contains(.appleSpeech($0)) }, id: \.self) {
                         speechRow($0)
                     }
                 }
-                Section("系统朗读语音") {
+                Section("settings.system_voices") {
                     ForEach(SpokenLanguage.allCases.filter { !priorityResources.contains(.voice($0)) }, id: \.self) {
                         voiceRow($0)
                     }
                 }
-                Section("普通话和日语识别") {
+                Section("settings.speech_engines") {
                     Picker(
-                        "引擎",
+                        "settings.speech_engine",
                         selection: Binding(get: { viewModel.engine }, set: viewModel.selectEngine)
                     ) {
                         ForEach(SpeechEngine.allCases, id: \.self) { engine in
@@ -50,22 +50,22 @@ struct SettingsView: View {
                     Section {
                         shanghainesePackRows
                     } header: {
-                        Text("上海话转换包")
+                        Text("settings.shanghainese_pack")
                     } footer: {
-                        Text("上海话录音和文字输入需要此转换包。下载后，上海话在设备上转成普通话，再翻译成日语。")
+                        Text("settings.shanghainese_pack_help")
                     }
                 }
                 Section {
-                    NavigationLink("隐私政策") {
+                    NavigationLink("settings.privacy_policy") {
                         PrivacyPolicyView()
                     }
                 }
             }
-            .navigationTitle("设置")
+            .navigationTitle("common.settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { dismiss() }
+                    Button("common.done") { dismiss() }
                 }
             }
             .task(id: scenePhase) {
@@ -152,15 +152,15 @@ struct SettingsView: View {
                 Text(title ?? language.title)
                 Spacer()
                 if let available = viewModel.voiceAvailability[language] {
-                    Text(available ? LocalizedStringKey("已就绪") : "请在系统设置中添加")
+                    Text(available ? LocalizedStringKey("common.ready") : "settings.add_voice_in_system_settings")
                         .foregroundStyle(.secondary)
                 } else {
                     ProgressView()
-                        .accessibilityLabel("正在检查")
+                        .accessibilityLabel("common.checking")
                 }
             }
             if viewModel.voiceAvailability[language] == false {
-                Text("在 iPhone 的「设置 → 辅助功能 → 阅读与朗读 → 语音」中添加此语言的语音。")
+                Text("settings.add_system_voice_instructions")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -170,7 +170,7 @@ struct SettingsView: View {
     @ViewBuilder
     private var whisperModelRows: some View {
         Picker(
-            "WhisperKit 模型",
+            "settings.whisper_model",
             selection: Binding(get: { viewModel.model }, set: viewModel.selectModel)
         ) {
             ForEach(WhisperModel.allCases, id: \.self) { model in
@@ -194,8 +194,8 @@ struct SettingsView: View {
     private var shanghainesePackRows: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text("上海话 → 普通话")
-                Text("约 310 MB")
+                Text("settings.shanghainese_to_mandarin")
+                Text("settings.shanghainese_pack_size")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -213,22 +213,22 @@ struct SettingsView: View {
     private var shanghainesePackControl: some View {
         switch viewModel.shanghaineseStatus {
         case .ready:
-            Text("已就绪").foregroundStyle(.secondary)
-            Button("删除", role: .destructive) {
+            Text("common.ready").foregroundStyle(.secondary)
+            Button("common.delete", role: .destructive) {
                 Task { await viewModel.removeShanghainesePack() }
             }
             .buttonStyle(.borderless)
             .accessibilityIdentifier("removeShanghainesePack")
         case .missing:
-            Button(viewModel.shanghaineseMessage == nil ? LocalizedStringKey("下载") : "重试下载") {
+            Button(viewModel.shanghaineseMessage == nil ? LocalizedStringKey("common.download") : "common.retry_download") {
                 Task { await viewModel.downloadShanghainesePack() }
             }
             .accessibilityIdentifier("downloadShanghainesePack")
         case .downloading:
-            downloadProgress(viewModel.shanghaineseProgress, title: "下载中")
+            downloadProgress(viewModel.shanghaineseProgress, title: "common.downloading")
         case nil:
             ProgressView()
-                .accessibilityLabel("正在检查")
+                .accessibilityLabel("common.checking")
         }
     }
 
@@ -236,22 +236,22 @@ struct SettingsView: View {
     private var whisperModelControl: some View {
         switch viewModel.modelStatus {
         case .ready:
-            Button("删除模型", role: .destructive) {
+            Button("settings.delete_model", role: .destructive) {
                 Task { await viewModel.removeModel() }
             }
         case .missing:
-            Button(viewModel.modelMessage == nil ? LocalizedStringKey("下载") : "重试下载") {
+            Button(viewModel.modelMessage == nil ? LocalizedStringKey("common.download") : "common.retry_download") {
                 Task { await viewModel.downloadModel() }
             }
         case .preparing:
             if let progress = viewModel.modelProgress {
-                downloadProgress(progress, title: "下载中")
+                downloadProgress(progress, title: "common.downloading")
             } else {
-                ProgressView("正在准备…")
+                ProgressView("common.preparing")
             }
         case nil:
             ProgressView()
-                .accessibilityLabel("正在检查")
+                .accessibilityLabel("common.checking")
         }
     }
 
@@ -274,23 +274,23 @@ struct SettingsView: View {
     private func speechStatus(for language: SpokenLanguage) -> some View {
         if viewModel.preparingSpeech == language {
             ProgressView()
-                .accessibilityLabel("正在准备识别资源")
+                .accessibilityLabel("settings.preparing_speech_resources")
         } else {
             switch viewModel.speechStatuses[language] {
             case .installed:
-                Text("已就绪").foregroundStyle(.secondary)
+                Text("common.ready").foregroundStyle(.secondary)
             case .supported:
-                Button(viewModel.failedSpeech == language ? LocalizedStringKey("重试") : "下载") {
+                Button(viewModel.failedSpeech == language ? LocalizedStringKey("common.retry") : "common.download") {
                     Task { await viewModel.downloadSpeech(for: language) }
                 }
                 .disabled(viewModel.preparingSpeech != nil)
             case .downloading:
-                Text("下载中").foregroundStyle(.secondary)
+                Text("common.downloading").foregroundStyle(.secondary)
             case nil:
                 ProgressView()
-                    .accessibilityLabel("正在检查")
+                    .accessibilityLabel("common.checking")
             default:
-                Text("不可用").foregroundStyle(.secondary)
+                Text("common.unavailable").foregroundStyle(.secondary)
             }
         }
     }
@@ -299,22 +299,22 @@ struct SettingsView: View {
     private func translationStatus(for direction: TranslationDirection) -> some View {
         if viewModel.downloading == direction {
             ProgressView()
-                .accessibilityLabel("正在准备翻译语言")
+                .accessibilityLabel("settings.preparing_translation_languages")
         } else {
             switch viewModel.translationStatuses[direction] {
             case .installed:
-                Text("已就绪")
+                Text("common.ready")
                     .foregroundStyle(.secondary)
             case .supported:
-                Button(viewModel.failedDownload == direction ? LocalizedStringKey("重试") : "下载") {
+                Button(viewModel.failedDownload == direction ? LocalizedStringKey("common.retry") : "common.download") {
                     viewModel.requestDownload(for: direction)
                 }
                 .disabled(viewModel.downloading != nil)
             case nil:
                 ProgressView()
-                    .accessibilityLabel("正在检查")
+                    .accessibilityLabel("common.checking")
             default:
-                Text("不可用")
+                Text("common.unavailable")
                     .foregroundStyle(.secondary)
             }
         }

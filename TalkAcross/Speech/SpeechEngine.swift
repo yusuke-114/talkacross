@@ -5,7 +5,7 @@ enum SpeechEngine: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .apple: String(localized: "Apple 原生")
+        case .apple: String(localized: "settings.apple_speech_engine")
         case .whisperKit: "WhisperKit"
         }
     }

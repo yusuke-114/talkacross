@@ -5,8 +5,8 @@ nonisolated enum ChineseSpeechInput: String, Sendable {
 
     var title: String {
         switch self {
-        case .mandarin: String(localized: "普通话")
-        case .shanghainese: String(localized: "上海话")
+        case .mandarin: String(localized: "language.mandarin")
+        case .shanghainese: String(localized: "language.shanghainese")
         }
     }
 
@@ -26,8 +26,8 @@ nonisolated enum SpokenLanguage: CaseIterable, Sendable {
 
     var title: String {
         switch self {
-        case .mandarin: String(localized: "中文")
-        case .japanese: String(localized: "日本語")
+        case .mandarin: String(localized: "language.chinese")
+        case .japanese: String(localized: "language.japanese")
         }
     }
 

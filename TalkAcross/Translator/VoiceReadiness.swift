@@ -10,15 +10,18 @@ enum VoiceResource: Hashable {
     var title: String {
         switch self {
         case .translation(let direction):
-            String(localized: "\(direction.source.title) → \(direction.target.title) 翻译资源")
+            String(
+                localized: "voice_setup.resource.translation",
+                defaultValue: "\(direction.source.title) → \(direction.target.title) translation resources"
+            )
         case .appleSpeech(let language):
-            String(localized: "\(language.title)语音识别资源")
+            String(localized: "voice_setup.resource.speech_recognition", defaultValue: "\(language.title) speech recognition resources")
         case .whisperModel:
-            String(localized: "WhisperKit 识别模型")
+            String(localized: "voice_setup.resource.whisper_model")
         case .shanghainesePack:
-            String(localized: "上海话转换包")
+            String(localized: "settings.shanghainese_pack")
         case .voice(let language):
-            String(localized: "\(language.title)朗读语音")
+            String(localized: "voice_setup.resource.voice", defaultValue: "\(language.title) read-aloud voice")
         }
     }
 }

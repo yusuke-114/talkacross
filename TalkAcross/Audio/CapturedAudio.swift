@@ -31,8 +31,8 @@ nonisolated enum AudioCaptureIssue: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .microphoneUnavailable: String(localized: "麦克风暂时不可用。")
-        case .bufferUnavailable, .conversionFailed: String(localized: "无法读取本轮录音，请重试。")
+        case .microphoneUnavailable: String(localized: "error.audio.microphone_unavailable")
+        case .bufferUnavailable, .conversionFailed: String(localized: "error.audio.capture_failed")
         }
     }
 }
