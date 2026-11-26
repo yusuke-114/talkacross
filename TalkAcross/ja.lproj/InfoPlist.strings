@@ -1,2 +1,3 @@
+"CFBundleDisplayName" = "となりの通訳";
 "NSMicrophoneUsageDescription" = "TalkAcross はマイクを使って音声を認識し、端末上で翻訳します。";
 "NSSpeechRecognitionUsageDescription" = "TalkAcross は Apple の音声認識を使って上海語を文字に変換します。音声は Apple のサーバーで処理される場合があります。";

@@ -54,6 +54,7 @@
         "CURRENT_PROJECT_VERSION": "1",
         "ENABLE_PREVIEWS": "YES",
         "GENERATE_INFOPLIST_FILE": "YES",
+        "INFOPLIST_KEY_CFBundleDisplayName": "随身口译",
         "INFOPLIST_KEY_ITSAppUsesNonExemptEncryption": "NO",
         "INFOPLIST_KEY_NSMicrophoneUsageDescription": "TalkAcross 使用麦克风识别你说的话，并在设备上翻译。",
         "INFOPLIST_KEY_NSSpeechRecognitionUsageDescription": "TalkAcross 使用 Apple 语音识别将上海话转成文字。录音可能由 Apple 服务器处理。",
